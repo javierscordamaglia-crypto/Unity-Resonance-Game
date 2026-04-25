@@ -2,85 +2,34 @@ using UnityEngine;
 
 namespace Core
 {
-    /// <summary>
-    /// A singleton MonoBehaviour that manages global world time.
-    /// Persists across scene loads and provides a centralized time source.
-    /// </summary>
     public class WorldClock : MonoBehaviour
     {
         private static WorldClock _instance;
-        private static readonly object _lock = new object();
-
-        [Header("Time Settings")]
-        [Tooltip("If true, time will advance automatically.")]
-        [SerializeField] private bool _autoAdvance = true;
-
-        [Tooltip("Multiplier for time progression. 1 = real-time, 2 = 2x speed, etc.")]
-        [SerializeField] private float _timeScale = 1f;
-
-        [Tooltip("Current world time in seconds.")]
-        [SerializeField] private float _currentTime = 0f;
-
         public static WorldClock Instance
         {
             get
             {
-                if (_instance != null)
+                if (_instance == null)
                 {
-                    return _instance;
+                    _instance = FindFirstObjectByType<WorldClock>();
+                    if (_instance == null)
+                    {
+                        GameObject singletonObject = new GameObject("WorldClock");
+                        _instance = singletonObject.AddComponent<WorldClock>();
+                    }
                 }
-
-                lock (_lock)
-                {
-                    if (_instance != null)
-                    {
-                        return _instance;
-                    }
-
-                    GameObject existingObject = GameObject.FindObjectOfType<WorldClock>()?.gameObject;
-
-                    if (existingObject == null)
-                    {
-                        existingObject = new GameObject("WorldClock");
-                        _instance = existingObject.AddComponent<WorldClock>();
-                    }
-                    else
-                    {
-                        _instance = existingObject.GetComponent<WorldClock>();
-                    }
-
-                    return _instance;
-                }
+                return _instance;
             }
         }
 
-        /// <summary>
-        /// Gets or sets whether the clock auto-advances.
-        /// </summary>
-        public bool AutoAdvance
-        {
-            get => _autoAdvance;
-            set => _autoAdvance = value;
-        }
+        [Header("Day Cycle Settings")]
+        public float dayDurationSeconds = 30f;
+        public int MaxDay = 9;
 
-        /// <summary>
-        /// Gets or sets the time scale multiplier.
-        /// </summary>
-        public float TimeScale
-        {
-            get => _timeScale;
-            set => _timeScale = Mathf.Max(0f, value);
-        }
+        private int currentDay = 1;
+        private float dayTimer = 0f;
 
-        /// <summary>
-        /// Gets the current world time in seconds.
-        /// </summary>
-        public float CurrentTime => _currentTime;
-
-        /// <summary>
-        /// Gets the current world time in a formatted HH:MM:SS string.
-        /// </summary>
-        public string FormattedTime => FormatTime(_currentTime);
+        public int CurrentDay => currentDay;
 
         private void Awake()
         {
@@ -96,50 +45,43 @@ namespace Core
 
         private void Update()
         {
-            if (_autoAdvance)
+            dayTimer += Time.deltaTime;
+
+            if (dayTimer >= dayDurationSeconds)
             {
-                _currentTime += Time.deltaTime * _timeScale;
+                dayTimer = 0f;
+                AdvanceDay();
             }
         }
 
-        /// <summary>
-        /// Adds time to the world clock.
-        /// </summary>
-        /// <param name="seconds">Amount of seconds to add.</param>
-        public void AddTime(float seconds)
+        private void AdvanceDay()
         {
-            _currentTime += seconds;
+            currentDay++;
+
+            if (currentDay > MaxDay)
+            {
+                currentDay = 1;
+            }
+
+            Debug.Log($"[WorldClock] Day changed to: {currentDay}");
         }
 
-        /// <summary>
-        /// Sets the world time to a specific value.
-        /// </summary>
-        /// <param name="seconds">The new time in seconds.</param>
-        public void SetTime(float seconds)
+        public void ForceAdvanceDay()
         {
-            _currentTime = Mathf.Max(0f, seconds);
+            AdvanceDay();
+            dayTimer = 0f;
         }
 
-        /// <summary>
-        /// Resets the world time to zero.
-        /// </summary>
-        public void ResetTime()
+        public void SetDay(int day)
         {
-            _currentTime = 0f;
+            currentDay = Mathf.Clamp(day, 1, MaxDay);
+            dayTimer = 0f;
+            Debug.Log($"[WorldClock] Day set to: {currentDay}");
         }
 
-        /// <summary>
-        /// Formats seconds into a HH:MM:SS string.
-        /// </summary>
-        /// <param name="seconds">Time in seconds.</param>
-        /// <returns>Formatted time string.</returns>
-        public static string FormatTime(float seconds)
+        public float GetDayProgress()
         {
-            int hours = Mathf.FloorToInt(seconds / 3600f);
-            int minutes = Mathf.FloorToInt((seconds % 3600f) / 60f);
-            int secs = Mathf.FloorToInt(seconds % 60f);
-
-            return $"{hours:D2}:{minutes:D2}:{secs:D2}";
+            return dayTimer / dayDurationSeconds;
         }
     }
 }
